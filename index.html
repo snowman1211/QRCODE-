@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>QR Code 掃描器 (加大版)</title>
+    <script src="https://unpkg.com/html5-qrcode" type="text/javascript"></script>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            background-color: #121212; /* 改為深色背景，更有掃描器的感覺 */
+            color: white;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: flex-start;
+            min-height: 100vh;
+            margin: 0;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+
+        .container {
+            width: 100%;
+            max-width: 500px;
+            text-align: center;
+        }
+
+        h2 { margin: 20px 0; font-weight: 300; }
+
+        /* 相機容器：設定為正方形或接近比例 */
+        #reader {
+            width: 100%;
+            background-color: #000;
+            border-radius: 16px;
+            overflow: hidden;
+            border: 2px solid #333;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+        }
+
+        /* 讓相機畫面內部的影片填滿 */
+        #reader video {
+            object-fit: cover !important;
+        }
+
+        .btn {
+            background-color: #007aff; /* iOS 藍 */
+            color: white;
+            border: none;
+            padding: 16px 32px;
+            border-radius: 12px;
+            font-size: 1.1em;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            margin-top: 20px;
+            box-shadow: 0 4px 12px rgba(0,122,255,0.3);
+        }
+
+        .result-box {
+            display: none;
+            margin-top: 20px;
+            padding: 20px;
+            background-color: #1e1e1e;
+            border-radius: 16px;
+            border: 1px solid #333;
+            animation: slideUp 0.3s ease-out;
+        }
+
+        .code-text {
+            font-size: 1.8em;
+            font-weight: bold;
+            color: #00d1ff;
+            word-break: break-all;
+            margin: 15px 0;
+            letter-spacing: 1px;
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(20px); opacity: 0; }
+            to { transform: translateY(0); opacity: 1; }
+        }
+
+        #error-msg {
+            color: #ff453a;
+            background: rgba(255, 69, 58, 0.1);
+            padding: 15px;
+            border-radius: 10px;
+            margin-top: 15px;
+            display: none;
+            font-size: 0.9em;
+        }
+    </style>
+</head>
+<body>
+
+<div class="container">
+    <h2>QR 掃描擷取</h2>
+    
+    <div id="reader"></div>
+
+    <div id="start-section">
+        <button onclick="startCamera()" class="btn">點擊開啟相機</button>
+    </div>
+
+    <div id="result-container" class="result-box">
+        <div style="color: #aaa;">擷取到的代碼</div>
+        <div id="extracted-code" class="code-text"></div>
+        <button onclick="copyToClipboard()" class="btn">📋 複製代碼</button>
+        <button onclick="resetScanner()" class="btn" style="background:#333;">🔄 重新掃描</button>
+    </div>
+
+    <div id="error-msg"></div>
+</div>
+
+<script>
+    let html5QrCode;
+
+    function startCamera() {
+        document.getElementById('error-msg').style.display = 'none';
+        html5QrCode = new Html5Qrcode("reader");
+
+        // 動態計算讀取框大小：取寬度的 80%，並確保是正方形
+        const qrboxFunction = function(viewfinderWidth, viewfinderHeight) {
+            let minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+            let fontSize = Math.floor(minEdge * 0.8); // 佔畫面的 80%
+            return {
+                width: fontSize,
+                height: fontSize
+            };
+        }
+
+        const config = { 
+            fps: 15, 
+            qrbox: qrboxFunction, // 使用動態正方形函數
+            aspectRatio: 1.0      // 強制要求 1:1 比例
+        };
+
+        html5QrCode.start(
+            { facingMode: "environment" }, 
+            config, 
+            onScanSuccess
+        )
+        .then(() => {
+            document.getElementById('start-section').style.display = 'none';
+        })
+        .catch(err => {
+            document.getElementById('error-msg').style.display = 'block';
+            document.getElementById('error-msg').innerText = "啟動錯誤: " + err;
+        });
+    }
+
+    function onScanSuccess(decodedText) {
+        // 震動回饋 (如果手機支援)
+        if (navigator.vibrate) navigator.vibrate(100);
+
+        html5QrCode.stop().then(() => {
+            const parts = decodedText.split('|');
+            const targetCode = (parts.length >= 2) ? parts[1] : decodedText;
+
+            document.getElementById('extracted-code').innerText = targetCode;
+            document.getElementById('result-container').style.display = 'block';
+            document.getElementById('reader').style.display = 'none';
+        });
+    }
+
+    function copyToClipboard() {
+        const text = document.getElementById('extracted-code').innerText;
+        navigator.clipboard.writeText(text).then(() => {
+            alert("✅ 已複製到剪貼簿");
+        }).catch(() => {
+            // 備用複製法
+            const el = document.createElement('textarea');
+            el.value = text;
+            document.body.appendChild(el);
+            el.select();
+            document.execCommand('copy');
+            document.body.removeChild(el);
+            alert("✅ 已複製");
+        });
+    }
+
+    function resetScanner() {
+        location.reload(); // 重新整理最能確保相機資源釋放並重啟
+    }
+</script>
+
+</body>
+</html>
